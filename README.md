@@ -1,0 +1,86 @@
+# 🎬 抖音无水印视频 / 图文下载器
+
+> 轻量 Python 工具：复制抖音分享链接，一键下载**无水印视频**或**图文原图**。
+> 仅依赖 `requests`，无需登录、无需签名、无需浏览器。
+
+```bash
+python douyin_dl.py "7.43 复制打开抖音，看看视频 https://v.douyin.com/xxxx/ 复制此链接"
+```
+
+## ✨ 功能特性
+
+- ✅ **无水印下载**：自动把 `playwm` 替换为 `play`，获取无水印版本
+- ✅ **视频 / 图文双支持**：自动识别作品类型，图集下载全部原图
+- ✅ **智能识别链接**：粘贴整段分享文案也能自动提取链接
+- ✅ **多种链接格式**：`v.douyin.com` 短链 / `iesdouyin.com` / `douyin.com/video`
+- ✅ **批量下载**：txt 每行一个链接，内置限速避免被 WAF
+- ✅ **进度显示**、失败自动重试、Windows 兼容（自动处理编码）
+
+## 📦 安装
+
+```bash
+pip install requests
+```
+
+## 🚀 使用
+
+### 单条下载
+```bash
+python douyin_dl.py "https://v.douyin.com/xxxx/"
+# 或直接粘贴整段分享文案
+python douyin_dl.py "7.43 复制打开抖音 https://v.douyin.com/xxxx/ 复制此链接"
+```
+
+### 批量下载
+```bash
+# links.txt 每行一条链接
+python douyin_dl.py links.txt -b
+```
+
+### 其他参数
+```bash
+python douyin_dl.py <链接> -o ./downloads   # 指定保存目录
+python douyin_dl.py <链接> --json           # 输出机器可读 JSON
+```
+
+## 🔧 原理简述
+
+1. 解析分享短链 → 跟随重定向拿到 `aweme_id`
+2. 用移动端 UA 请求 `https://www.iesdouyin.com/share/video/<id>`
+3. 从页面内嵌 `_ROUTER_DATA` 提取 `play_addr.url_list[0]`
+4. 地址中 `playwm` → `play`，获得无水印地址并下载
+
+## 🙏 致谢
+
+技术方案参考以下开源项目（均为社区公开的解析思路）：
+
+- [boredbar9527/douyin-download-skill](https://github.com/boredbar9527/douyin-download-skill) —— `_ROUTER_DATA` 解析思路
+- [belingud/douyin-downloader-skill](https://github.com/belingud/douyin-downloader-skill)（MIT）—— 图文处理思路
+- [aehyok/douyin-video-download](https://github.com/aehyok/douyin-video-download)（MIT）—— 链接解析思路
+
+本项目为独立实现，并在以下方面做了增强：更健壮的 JSON 提取（兼容 `_ROUTER_DATA` / `RENDER_DATA` 两种形态）、自动识别视频/图文、批量限速、重试与错误处理。
+
+## ⚠️ 免责声明
+
+本工具**仅用于学习研究及个人合理使用**（如个人归档公开可访问的内容）。
+请遵守您所在国家/地区的法律法规以及抖音服务条款，尊重创作者与版权所有者权益。
+
+- 请勿将本工具用于任何**商业用途**、**侵权用途**，或批量下载、再分发受版权保护的内容。
+- 使用本工具产生的任何风险与法律责任由使用者自行承担。
+- 如内容侵犯了您的合法权益，请联系我们，我们将第一时间移除相关链接与内容。
+
+## 🧪 测试
+
+```bash
+python test_douyin.py   # 单元测试（无需网络）
+```
+
+## ☕ 支持作者
+
+如果这个工具帮到了你，欢迎扫码赞赏支持，让我有动力持续更新下去～
+
+<img src="assets/donate.png" alt="赞赏码" width="200">
+
+## 📄 License
+
+[MIT](./LICENSE) © 2026 qgeng1465
