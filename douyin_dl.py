@@ -52,7 +52,7 @@ _HTML_ESCAPE = {"&quot;": '"', "&amp;": "&", "&lt;": "<", "&gt;": ">", "&#39;": 
 
 def sanitize_name(name: str, max_len: int = 80) -> str:
     """去掉 Windows/各平台非法字符，控制长度。"""
-    name = re.sub(r'[\\/:*?"<>|\r\n\t]', "_", name).strip().strip(".")
+    name = re.sub(r'[\\/:*?"<>|\r\n\t#]', "_", name).strip().strip(".")
     name = re.sub(r"\s+", " ", name)
     if not name:
         name = "douyin"
@@ -293,7 +293,7 @@ def download_one(link_or_text: str, out_dir: Path, session: requests.Session) ->
 def main():
     ap = argparse.ArgumentParser(description="抖音无水印视频/图文下载器 (仅供学习研究使用)")
     ap.add_argument("input", help="分享链接 / 分享文本 / 含链接的txt文件")
-    ap.add_argument("-o", "--output", default="downloads", help="保存目录 (默认 downloads)")
+    ap.add_argument("-o", "--output", default="/storage/emulated/0/Pictures/douyin", help="保存目录 (默认 downloads)")
     ap.add_argument("-b", "--batch", action="store_true", help="输入是 txt 文件，每行一个链接")
     ap.add_argument("--json", action="store_true", help="输出机器可读 JSON 摘要")
     args = ap.parse_args()
