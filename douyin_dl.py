@@ -272,14 +272,16 @@ def download_one(link_or_text: str, out_dir: Path, session: requests.Session) ->
     elif info["type"] == "images" and info["images"]:
         print(f"  [*] 图文作品: {len(info['images'])} 张 by {info['author'] or '未知'}")
         base = sanitize_name(f"{info['author']}_{info['title']}") or aweme_id
-        sub = out_dir / base
-        sub.mkdir(parents=True, exist_ok=True)
+        sub = out_dir
+        if len(info["images"]) > 10 :
+          sub = out_dir / base
+          sub.mkdir(parents=True, exist_ok=True)
         ok = 0
         for i, img_url in enumerate(info["images"], 1):
             ext = Path(img_url.split("?")[0]).suffix or ".jpg"
             if len(ext) > 5:
                 ext = ".jpg"
-            dest = sub / f"{i:02d}{ext}"
+            dest = sub / f"{base}{i:02d}{ext}"
             if download(img_url, dest, session, {"User-Agent": UA_MOBILE}, label=f"图片{i}"):
                 ok += 1
         print(f"  [✓] 已保存 {ok}/{len(info['images'])} 张到: {sub}")
