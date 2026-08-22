@@ -222,7 +222,7 @@ def download(url: str, dest: Path, session: requests.Session, headers: dict, lab
                             pct = done * 100 // total
                             sys.stdout.write(f"\r  {label} {pct}% ({done // 1024 // 1024}MB/{total // 1024 // 1024}MB)")
                             sys.stdout.flush()
-                sys.stdout.write("\r" + " " * 60 + "\r")
+                sys.stdout.write("\r")
                 if os.path.getsize(dest) == 0:
                     raise ValueError("空文件（可能 UA 不对或被限流）")
                 return True
@@ -284,8 +284,15 @@ def download_one(link_or_text: str, out_dir: Path, session: requests.Session) ->
             dest = sub / f"{base}{i:02d}{ext}"
             if download(img_url, dest, session, {"User-Agent": UA_MOBILE}, label=f"图片{i}"):
                 ok += 1
+        bgm_sub =out_dir / "bgm_musics"
+        img_music = info["video_url"].split('video_id=')[1].split('&')[0]
+        bgm_sub.mkdir(parents=True, exist_ok=True)
         print(f"  [✓] 已保存 {ok}/{len(info['images'])} 张到: {sub}")
         info["dir"] = str(sub)
+        if "mp3" in img_music:
+          alert = input("是否需要下载图集背景音乐？(Y/y 下载): ")
+          if alert.lower() == 'y' :
+            download(img_music, f"{bgm_sub}/{base}.mp3", session, {"User-Agent": UA_MOBILE}, label=f"下载背景音乐")
     else:
         print("  [!] 未能识别作品类型（视频或图文）")
         return None
