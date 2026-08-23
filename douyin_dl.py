@@ -204,6 +204,17 @@ def no_watermark(url: str) -> str:
     return url.replace("/playwm/", "/play/").replace("playwm", "play")
 
 
+def format_size(size):
+    """格式化文件大小"""
+    if size < 1024:
+        return f"{size}B"
+    elif size < 1024 * 1024:
+        return f"{size / 1024:.1f}KB"
+    elif size < 1024 * 1024 * 1024:
+        return f"{size / 1024 / 1024:.1f}MB"
+    else:
+        return f"{size / 1024 / 1024 / 1024:.1f}GB"
+
 def download(url: str, dest: Path, session: requests.Session, headers: dict, label: str = ""):
     """下载到 dest，带进度条与重试。"""
     for attempt in range(3):
@@ -220,9 +231,11 @@ def download(url: str, dest: Path, session: requests.Session, headers: dict, lab
                         done += len(chunk)
                         if total:
                             pct = done * 100 // total
-                            sys.stdout.write(f"\r  {label} {pct}% ({done // 1024 // 1024}MB/{total // 1024 // 1024}MB)")
+                            downloaded_str = format_size(done)
+                            total_str = format_size(total)
+                            sys.stdout.write(f"\r  {label} {pct}% ({downloaded_str}/{total_str})")
                             sys.stdout.flush()
-                sys.stdout.write("\r")
+                sys.stdout.write("\033[2K\r")
                 if os.path.getsize(dest) == 0:
                     raise ValueError("空文件（可能 UA 不对或被限流）")
                 return True
@@ -289,7 +302,7 @@ def download_one(link_or_text: str, out_dir: Path, session: requests.Session) ->
         bgm_sub.mkdir(parents=True, exist_ok=True)
         print(f"  [✓] 已保存 {ok}/{len(info['images'])} 张到: {sub}")
         info["dir"] = str(sub)
-        if "mp3" in img_music:
+        if img_music:
           alert = input("是否需要下载图集背景音乐？(Y/y 下载): ")
           if alert.lower() == 'y' :
             download(img_music, f"{bgm_sub}/{base}.mp3", session, {"User-Agent": UA_MOBILE}, label=f"下载背景音乐")
