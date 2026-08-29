@@ -18,7 +18,7 @@ def extract_datetime_from_filename(filename):
     """从文件名提取时间戳 (20251224-111009)"""
     match = re.search(r'(\d{8})-(\d{6})', filename)
     if match:
-        return match.group(0)  # 返回完整时间戳
+        return match.group(0)
     return None
 
 def extract_id_from_filename(filename):
@@ -34,6 +34,29 @@ def truncate_filename(filename, max_len=30):
         return filename
     return f"{filename[:15]}...{filename[-10:]}"
 
+def set_exif_time(filename, time_str):
+    """设置EXIF时间"""
+    cmd = ['exiftool', '-AllDates=' + time_str, '-overwrite_original', filename]
+    try:
+        subprocess.run(cmd, check=True, 
+                     stdout=subprocess.DEVNULL, 
+                     stderr=subprocess.DEVNULL)
+        return True
+    except subprocess.CalledProcessError:
+        return False
+
+def set_file_modification_time(filename, time_str):
+    """设置文件修改时间"""
+    # 将 "2026:08:29 14:35:13" 转换为 "202608291435.13" 格式
+    # 或直接使用 datetime 对象
+    try:
+        dt = datetime.strptime(time_str, "%Y:%m:%d %H:%M:%S")
+        timestamp = dt.timestamp()
+        os.utime(filename, (timestamp, timestamp))
+        return True
+    except Exception:
+        return False
+
 def process_jpg_files():
     # 收集所有jpg文件
     jpg_files = [f for f in os.listdir('.') if f.endswith('.jpg')]
@@ -44,9 +67,9 @@ def process_jpg_files():
         return
     
     # 分类文件
-    has_timestamp = []      # 有时间戳的文件
-    has_id_only = []        # 只有ID没有时间戳的文件
-    skipped_files = []      # 都不匹配的文件
+    has_timestamp = []
+    has_id_only = []
+    skipped_files = []
     
     print(f"{Colors.CYAN}正在扫描文件...{Colors.RESET}")
     for filename in jpg_files:
@@ -95,15 +118,11 @@ def process_jpg_files():
             print(f"    {Colors.CYAN}时间: {Colors.YELLOW}{new_time}{Colors.RESET}")
             
             # 修改EXIF
-            cmd = ['exiftool', '-AllDates=' + new_time, '-overwrite_original', filename]
-            try:
-                subprocess.run(cmd, check=True, 
-                             stdout=subprocess.DEVNULL, 
-                             stderr=subprocess.DEVNULL)
+            if set_exif_time(filename, new_time):
                 processed += 1
                 total_processed += 1
-            except subprocess.CalledProcessError:
-                print(f"{Colors.RED}      错误: 修改失败{Colors.RESET}")
+            else:
+                print(f"{Colors.RED}      错误: EXIF修改失败{Colors.RESET}")
     
     # ========== 第二部分：处理仅含ID的文件 ==========
     if has_id_only:
@@ -135,15 +154,21 @@ def process_jpg_files():
                 print(f"      {Colors.GREEN}[{file_idx}/{len(files)}]{Colors.RESET} {Colors.BLUE}{display_name}{Colors.RESET}")
                 
                 # 修改EXIF
-                cmd = ['exiftool', '-AllDates=' + time_str, '-overwrite_original', filename]
-                try:
-                    subprocess.run(cmd, check=True, 
-                                 stdout=subprocess.DEVNULL, 
-                                 stderr=subprocess.DEVNULL)
+                exif_success = set_exif_time(filename, time_str)
+                
+                # 修改文件修改时间
+                filetime_success = set_file_modification_time(filename, time_str)
+                
+                if exif_success and filetime_success:
                     processed += 1
                     total_processed += 1
-                except subprocess.CalledProcessError:
-                    print(f"{Colors.RED}        错误: 修改失败{Colors.RESET}")
+                    print(f"        {Colors.CYAN}✓ EXIF和文件时间已更新{Colors.RESET}")
+                elif exif_success:
+                    print(f"        {Colors.YELLOW}⚠ EXIF已更新，但文件时间修改失败{Colors.RESET}")
+                    processed += 1
+                    total_processed += 1
+                else:
+                    print(f"        {Colors.RED}✗ 修改失败{Colors.RESET}")
     
     # ========== 最终结果 ==========
     print(f"\n{Colors.GREEN}完成! 共处理 {total_processed} 个文件{Colors.RESET}")
