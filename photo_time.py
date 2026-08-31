@@ -1,3 +1,6 @@
+
+
+
 #!/usr/bin/env python3
 import os
 import re
@@ -47,19 +50,26 @@ def set_exif_time(filename, time_str):
 
 def set_file_modification_time(filename, time_str):
     """设置文件修改时间"""
-    # 将 "2026:08:29 14:35:13" 转换为 "202608291435.13" 格式
-    # 或直接使用 datetime 对象
     try:
         dt = datetime.strptime(time_str, "%Y:%m:%d %H:%M:%S")
         timestamp = dt.timestamp()
-        os.utime(filename, (timestamp, timestamp))
+        #os.utime(filename, (timestamp, timestamp))
         return True
     except Exception:
         return False
 
+def get_file_modification_time(filename):
+    """获取文件修改时间"""
+    try:
+        timestamp = os.path.getmtime(filename)
+        return datetime.fromtimestamp(timestamp)
+    except Exception:
+        return None
+
 def process_jpg_files():
     # 收集所有jpg文件
-    jpg_files = [f for f in os.listdir('.') if f.endswith('.jpg')]
+    # = [f for f in os.listdir('.') if f.endswith('.jpg')]
+    jpg_files = [f for f in os.listdir('.') if f.endswith('.jpg') or f.endswith('.png')]
     total = len(jpg_files)
     
     if total == 0:
@@ -100,24 +110,17 @@ def process_jpg_files():
         print(f"\n{Colors.CYAN}=== 处理带时间戳的文件 (UTC→UTC+8) ==={Colors.RESET}")
         
         for idx, filename in enumerate(has_timestamp, 1):
-            # 提取时间戳
             datetime_str = extract_datetime_from_filename(filename)
             date_part, time_part = datetime_str.split('-')
             
-            # 解析UTC时间
             utc_time = datetime.strptime(f"{date_part} {time_part}", "%Y%m%d %H%M%S")
-            
-            # 转换为UTC+8
             local_time = utc_time + timedelta(hours=8)
-            
-            # 格式化为EXIF需要的格式
             new_time = local_time.strftime("%Y:%m:%d %H:%M:%S")
             
             display_name = truncate_filename(filename)
             print(f"  {Colors.GREEN}[{idx}/{len(has_timestamp)}]{Colors.RESET} {Colors.BLUE}{display_name}{Colors.RESET}")
             print(f"    {Colors.CYAN}时间: {Colors.YELLOW}{new_time}{Colors.RESET}")
             
-            # 修改EXIF
             if set_exif_time(filename, new_time):
                 processed += 1
                 total_processed += 1
@@ -126,7 +129,7 @@ def process_jpg_files():
     
     # ========== 第二部分：处理仅含ID的文件 ==========
     if has_id_only:
-        print(f"\n{Colors.CYAN}=== 处理仅含ID的文件 (使用当前时间) ==={Colors.RESET}")
+        print(f"\n{Colors.CYAN}=== 处理仅含ID的文件 (使用最旧的文件修改时间) ==={Colors.RESET}")
         
         # 按ID分组
         id_to_files = {}
@@ -137,32 +140,74 @@ def process_jpg_files():
                     id_to_files[file_id] = []
                 id_to_files[file_id].append(filename)
         
-        # 为每个ID生成唯一时间
-        base_time = datetime.now()
+        # 计算每个ID的最旧时间
+        id_oldest_times = {}
+        for file_id, files in id_to_files.items():
+            file_times = []
+            for filename in files:
+                mtime = get_file_modification_time(filename)
+                if mtime:
+                    file_times.append((filename, mtime))
+            
+            if file_times:
+                oldest_file, oldest_time = min(file_times, key=lambda x: x[1])
+                id_oldest_times[file_id] = {
+                    'time': oldest_time,
+                    'file': oldest_file,
+                    'files': files
+                }
         
-        for id_idx, (file_id, files) in enumerate(id_to_files.items(), 1):
-            # 每个ID间隔1秒，确保唯一
-            current_time = base_time + timedelta(seconds=id_idx)
-            time_str = current_time.strftime("%Y:%m:%d %H:%M:%S")
+        # 处理不同ID之间的时间冲突
+        used_times = set()
+        sorted_ids = sorted(id_oldest_times.items())
+        
+        for id_idx, (file_id, info) in enumerate(sorted_ids, 1):
+            base_time = info['time']
+            files = info['files']
+            oldest_file = info['file']
             
-            print(f"\n  {Colors.MAGENTA}[ID {id_idx}/{len(id_to_files)}] {file_id}{Colors.RESET}")
-            print(f"    {Colors.CYAN}分配时间: {Colors.YELLOW}{time_str}{Colors.RESET}")
-            print(f"    {Colors.CYAN}包含 {len(files)} 个文件{Colors.RESET}")
+            # 检查这个ID的时间是否已被其他ID占用
+            time_str = base_time.strftime("%Y:%m:%d %H:%M:%S")
+            adjusted_time = base_time
+            offset = 0
             
+            while time_str in used_times:
+                offset += 1
+                adjusted_time = base_time + timedelta(seconds=offset)
+                time_str = adjusted_time.strftime("%Y:%m:%d %H:%M:%S")
+            
+            # 把这个时间加入已使用集合
+            used_times.add(time_str)
+            
+            print(f"\n  {Colors.MAGENTA}[ID {id_idx}/{len(id_oldest_times)}] {file_id}{Colors.RESET}")
+            if offset > 0:
+                print(f"    {Colors.YELLOW}⚠ 与其他ID时间冲突，整体偏移 +{offset}秒{Colors.RESET}")
+            print(f"    {Colors.CYAN}使用时间: {Colors.YELLOW}{time_str}{Colors.RESET}")
+            print(f"    {Colors.CYAN}来自文件: {Colors.BLUE}{truncate_filename(oldest_file)}{Colors.RESET}")
+            print(f"    {Colors.CYAN}包含 {len(files)} 个文件 (全部使用同一时间){Colors.RESET}")
+            
+            # 这个ID下的所有文件都使用同一个时间
             for file_idx, filename in enumerate(files, 1):
                 display_name = truncate_filename(filename)
-                print(f"      {Colors.GREEN}[{file_idx}/{len(files)}]{Colors.RESET} {Colors.BLUE}{display_name}{Colors.RESET}")
+                is_oldest = (filename == oldest_file)
                 
-                # 修改EXIF
+                if is_oldest:
+                    print(f"      {Colors.GREEN}[{file_idx}/{len(files)}]{Colors.RESET} {Colors.BLUE}{display_name}{Colors.RESET} {Colors.CYAN}← 最旧{Colors.RESET}")
+                else:
+                    print(f"      {Colors.GREEN}[{file_idx}/{len(files)}]{Colors.RESET} {Colors.BLUE}{display_name}{Colors.RESET}")
+                    file_mtime = get_file_modification_time(filename)
+                    if file_mtime:
+                        print(f"        {Colors.CYAN}原时间: {Colors.YELLOW}{file_mtime.strftime('%Y:%m:%d %H:%M:%S')}{Colors.RESET}")
+                
+                # 修改EXIF和文件时间
                 exif_success = set_exif_time(filename, time_str)
-                
-                # 修改文件修改时间
                 filetime_success = set_file_modification_time(filename, time_str)
                 
                 if exif_success and filetime_success:
                     processed += 1
                     total_processed += 1
-                    print(f"        {Colors.CYAN}✓ EXIF和文件时间已更新{Colors.RESET}")
+                    if not is_oldest:
+                        print(f"        {Colors.CYAN}✓ 已更新为统一时间{Colors.RESET}")
                 elif exif_success:
                     print(f"        {Colors.YELLOW}⚠ EXIF已更新，但文件时间修改失败{Colors.RESET}")
                     processed += 1
