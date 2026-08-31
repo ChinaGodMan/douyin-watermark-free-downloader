@@ -37,12 +37,18 @@ def truncate_filename(filename, max_len=30):
         return filename
     return f"{filename[:15]}...{filename[-10:]}"
 
-def set_exif_time(filename, time_str):
-    """设置EXIF时间"""
-    cmd = ['exiftool', '-AllDates=' + time_str, '-overwrite_original', filename]
+def set_exif_time(filename, time_str, remark="SetTimeOk"):
+    """设置EXIF时间，并写入自定义备注"""
+    cmd = [
+        'exiftool',
+        '-AllDates=' + time_str,
+        '-UserComment=' + remark,  # 新增写入备注
+        '-overwrite_original',
+        filename
+    ]
     try:
-        subprocess.run(cmd, check=True, 
-                     stdout=subprocess.DEVNULL, 
+        subprocess.run(cmd, check=True,
+                     stdout=subprocess.DEVNULL,
                      stderr=subprocess.DEVNULL)
         return True
     except subprocess.CalledProcessError:
