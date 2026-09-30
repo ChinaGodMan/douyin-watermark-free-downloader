@@ -21,6 +21,7 @@ import os
 import re
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
@@ -278,7 +279,8 @@ def download_one(link_or_text: str, out_dir: Path, session: requests.Session) ->
         print(f"  [*] 视频: {info['title'][:40] or '(无标题)'} by {info['author'] or '未知'}")
         video_url = no_watermark(info["video_url"])
         fname = sanitize_name(f"{info['author']}_{info['title']}") or aweme_id
-        dest = out_dir / f"{fname}.mp4"
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        dest = out_dir / f"{fname}_{timestamp}.mp4"
         if download(video_url, dest, session, {"User-Agent": UA_MOBILE}, label="视频"):
             print(f"  [✓] 已保存: {dest}")
         info["file"] = str(dest)
